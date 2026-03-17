@@ -4,7 +4,7 @@ A local-first, AI-powered note-taking application and Evernote (.enex) explorer 
 
 Nexus Notes allows you to import your Evernote backups, organize your thoughts, and interact with your personal knowledge base using Google's Gemini AI—all while keeping your data strictly local and secure.
 
-##✨ Features
+### ✨ Features
 
 🏠 Local-First Architecture: Your notes, images, PDFs, and chat histories are stored entirely offline in your browser's IndexedDB. No backend servers, no cloud databases, zero latency.
 
@@ -18,7 +18,7 @@ Nexus Notes allows you to import your Evernote backups, organize your thoughts, 
 
 📱 Fully Responsive UI: A modern, Tailwind-powered interface that works beautifully on desktop, tablet, and mobile devices.
 
-##🚀 Getting Started
+### 🚀 Getting Started
 
 Because Nexus Notes is a zero-dependency, single-file web application, setup is instant.
 
@@ -46,7 +46,7 @@ Cryptography: Native Web Crypto API (crypto.subtle)
 
 AI Integration: Google Generative AI REST API (gemini-2.5-flash)
 
-##💡 How the AI Context Works
+### 💡 How the AI Context Works
 
 To preserve API tokens and optimize response times, Nexus Notes uses a smart context-injection strategy:
 
@@ -56,7 +56,7 @@ This bundle is injected behind the scenes into the first user message payload se
 
 Subsequent messages in the same chat thread rely on the AI's conversation history, ensuring rapid back-and-forth interactions without re-uploading the same attachments.
 
-##🔐 Security & Privacy
+### 🔐 Security & Privacy
 
 Zero Tracking: There is no tracking, analytics, or telemetry.
 
