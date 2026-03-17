@@ -32,7 +32,7 @@ Click the Settings (gear icon) in the app and paste your API key. (Note: Your ke
 
 Import Data: Click the Import .enex button to load your Evernote backups, or click New Note to start from scratch.
 
-##It sh🛠️ Technology Stack
+### 🛠️ Technology Stack
 
 Frontend: HTML5, Vanilla JavaScript (ES6+)
 
