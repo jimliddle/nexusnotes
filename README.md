@@ -1,4 +1,4 @@
-##Nexus Notes 🧠📓
+## Nexus Notes 🧠📓
 
 A local-first, AI-powered note-taking application and Evernote (.enex) explorer built entirely in a single HTML file.
 
