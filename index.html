@@ -1405,7 +1405,7 @@
 
             const scope = document.getElementById('export-scope').value;
 
-            showToast("Encrypting data...", "info");
+            showToast("Encrypting data... this may take a moment for large datasets.", "info");
             try {
                 const allNotes = await getNotes();
                 let notesToExport = [];
@@ -1430,29 +1430,29 @@
                     if (c && c.length > 0) chatData.push({ noteId: n.id, messages: c });
                 }
 
-                const dataStr = JSON.stringify({ notes: notesToExport, chats: chatData });
-                const dataBytes = new TextEncoder().encode(dataStr);
-
-                // Generate random salt and IV
+                // NEW CHUNKED ENCRYPTION FORMAT (V2)
+                // Solves V8 "Invalid string length" errors for gigabyte-scale datasets
+                const MAGIC = new TextEncoder().encode("WAI2");
                 const salt = crypto.getRandomValues(new Uint8Array(16));
-                const iv = crypto.getRandomValues(new Uint8Array(12));
-                
                 const key = await deriveKey(pwd, salt);
-                
-                // Encrypt using AES-GCM
-                const ciphertext = await crypto.subtle.encrypt(
-                    { name: "AES-GCM", iv: iv },
-                    key,
-                    dataBytes
-                );
+                const chunks = [MAGIC, salt];
 
-                // Package: Salt (16b) + IV (12b) + Ciphertext
-                const exportData = new Uint8Array(salt.length + iv.length + ciphertext.byteLength);
-                exportData.set(salt, 0);
-                exportData.set(iv, salt.length);
-                exportData.set(new Uint8Array(ciphertext), salt.length + iv.length);
+                const processItem = async (type, item) => {
+                    const dataStr = JSON.stringify({ type, data: item });
+                    const dataBytes = new TextEncoder().encode(dataStr);
+                    const iv = crypto.getRandomValues(new Uint8Array(12));
+                    const ciphertext = await crypto.subtle.encrypt({ name: "AES-GCM", iv: iv }, key, dataBytes);
+                    
+                    const lengthBuf = new ArrayBuffer(4);
+                    new DataView(lengthBuf).setUint32(0, ciphertext.byteLength, true); // Little endian
+                    
+                    chunks.push(iv, new Uint8Array(lengthBuf), ciphertext);
+                };
 
-                const blob = new Blob([exportData], { type: "application/octet-stream" });
+                for (const n of notesToExport) await processItem('note', n);
+                for (const c of chatData) await processItem('chat', c);
+
+                const blob = new Blob(chunks, { type: "application/octet-stream" });
                 const url = URL.createObjectURL(blob);
                 const a = document.createElement('a');
                 a.href = url;
@@ -1491,23 +1491,52 @@
             const reader = new FileReader();
             reader.onload = async (e) => {
                 try {
-                    const data = new Uint8Array(e.target.result);
-                    
-                    // Extract parts
-                    const salt = data.slice(0, 16);
-                    const iv = data.slice(16, 28);
-                    const ciphertext = data.slice(28);
+                    const fileBuffer = e.target.result;
+                    if (fileBuffer.byteLength < 4) throw new Error("File too small");
 
-                    const key = await deriveKey(pwd, salt);
-                    
-                    const decrypted = await crypto.subtle.decrypt(
-                        { name: "AES-GCM", iv: iv },
-                        key,
-                        ciphertext
-                    );
+                    const textDecoder = new TextDecoder();
+                    const magicHeader = textDecoder.decode(new Uint8Array(fileBuffer, 0, 4));
 
-                    const jsonStr = new TextDecoder().decode(decrypted);
-                    const parsed = JSON.parse(jsonStr);
+                    let parsedNotes = [];
+                    let parsedChats = [];
+
+                    if (magicHeader === "WAI2") {
+                        // V2 Format: Chunked processing to handle GBs of data efficiently
+                        let offset = 4;
+                        const salt = new Uint8Array(fileBuffer, offset, 16);
+                        offset += 16;
+                        const key = await deriveKey(pwd, salt);
+                        const dataView = new DataView(fileBuffer);
+
+                        while (offset < fileBuffer.byteLength) {
+                            const iv = new Uint8Array(fileBuffer, offset, 12);
+                            offset += 12;
+                            const ctLength = dataView.getUint32(offset, true);
+                            offset += 4;
+                            const ciphertext = new Uint8Array(fileBuffer, offset, ctLength); // View without deep copying
+                            offset += ctLength;
+
+                            const decrypted = await crypto.subtle.decrypt({ name: "AES-GCM", iv: iv }, key, ciphertext);
+                            const jsonStr = textDecoder.decode(decrypted);
+                            const record = JSON.parse(jsonStr);
+
+                            if (record.type === 'note') parsedNotes.push(record.data);
+                            else if (record.type === 'chat') parsedChats.push(record.data);
+                        }
+                    } else {
+                        // Legacy Format V1
+                        const salt = new Uint8Array(fileBuffer, 0, 16);
+                        const iv = new Uint8Array(fileBuffer, 16, 12);
+                        const ciphertext = new Uint8Array(fileBuffer, 28);
+
+                        const key = await deriveKey(pwd, salt);
+                        const decrypted = await crypto.subtle.decrypt({ name: "AES-GCM", iv: iv }, key, ciphertext);
+                        const jsonStr = textDecoder.decode(decrypted);
+                        const parsed = JSON.parse(jsonStr);
+                        
+                        parsedNotes = parsed.notes || [];
+                        parsedChats = parsed.chats || [];
+                    }
 
                     if (mode === 'replace') {
                         await clearDatabase();
@@ -1520,12 +1549,12 @@
 
                     // Re-populate DB
                     let importedCount = 0;
-                    for (const note of parsed.notes) {
+                    for (const note of parsedNotes) {
                         await saveNote(note);
                         if (note.notebook) state.expandedNotebooks.add(note.notebook);
                         importedCount++;
                     }
-                    for (const chat of parsed.chats) {
+                    for (const chat of parsedChats) {
                         await saveChat(chat.noteId, chat.messages);
                     }
 
