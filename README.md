@@ -22,7 +22,7 @@ Why AIs Notes allows you to import your Evernote backups, organize your thoughts
 
 Because Why AIs Notes is a zero-dependency, single-file web application, setup is instant.
 
-You can use the App directly from your browser and all state is stored on your loccal browser - nothing server-side: [https://jimliddle.github.io/Why AIsnotes/](https://jimliddle.github.io/WhyAInotes/)
+You can use the App directly from your browser and all state is stored on your loccal browser - nothing server-side: https://jimliddle.github.io/WhyAInotes/
 
 Download: Clone this repository or simply download the index.html file.
 
