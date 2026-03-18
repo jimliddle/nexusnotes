@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nexus Notes</title>
+    <title>WhyAI Notes</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://unpkg.com/lucide@latest"></script>
     <style>
@@ -46,7 +46,7 @@
             <div class="p-4 border-b border-gray-200 flex justify-between items-center bg-gray-50">
                 <h1 class="font-bold text-lg flex items-center gap-2 text-indigo-700">
                     <i data-lucide="book-open" class="w-5 h-5"></i>
-                    Nexus Notes
+                    WhyAI Notes
                 </h1>
                 <button onclick="toggleSettings()" class="p-2 text-gray-500 hover:text-gray-800 hover:bg-gray-200 rounded-lg transition" title="Settings">
                     <i data-lucide="settings" class="w-5 h-5"></i>
@@ -108,7 +108,7 @@
 
                     <!-- Rendered Inline PDFs -->
                     <div id="pdf-gallery" class="mt-8 space-y-6 hidden">
-                        <!-- Object tags for PDFs injected here -->
+                        <!-- Iframes for PDFs injected here -->
                     </div>
 
                     <!-- Non-image/Non-PDF Attachments -->
@@ -320,6 +320,7 @@
         };
 
         let draftResources = []; // Temporarily hold attachments while creating a note
+        let activeBlobUrls = []; // Track PDF blob URLs to prevent memory leaks
 
         // --- 2. Database Integration (IndexedDB) ---
         function initDB() {
@@ -787,6 +788,12 @@
             lucide.createIcons();
         }
 
+        // Cleanup function for blob URLs
+        function cleanupBlobUrls() {
+            activeBlobUrls.forEach(url => URL.revokeObjectURL(url));
+            activeBlobUrls = [];
+        }
+
         async function selectNote(id) {
             state.activeNoteId = id;
             renderSidebar();
@@ -836,7 +843,10 @@
                 imageGallery.classList.add('hidden');
             }
 
-            // Render Inline PDFs
+            // Cleanup old blobs before creating new ones
+            cleanupBlobUrls();
+
+            // Render Inline PDFs using Blob URLs to bypass Chromium Data URL restrictions
             const pdfGallery = document.getElementById('pdf-gallery');
             pdfGallery.innerHTML = '';
 
@@ -853,10 +863,20 @@
                         <button onclick="downloadResource('${pdf.id}')" class="text-gray-500 hover:text-indigo-600 transition p-1 hover:bg-gray-100 rounded" title="Download PDF"><i data-lucide="download" class="w-4 h-4"></i></button>
                     `;
                     
-                    const obj = document.createElement('object');
-                    obj.data = `data:application/pdf;base64,${pdf.data}`;
-                    obj.type = "application/pdf";
-                    obj.className = "w-full h-[600px]"; // Give it a fixed height for inline viewing
+                    // Create Blob URL for secure rendering
+                    const byteCharacters = atob(pdf.data);
+                    const byteNumbers = new Array(byteCharacters.length);
+                    for (let i = 0; i < byteCharacters.length; i++) {
+                        byteNumbers[i] = byteCharacters.charCodeAt(i);
+                    }
+                    const byteArray = new Uint8Array(byteNumbers);
+                    const blob = new Blob([byteArray], {type: 'application/pdf'});
+                    const blobUrl = URL.createObjectURL(blob);
+                    activeBlobUrls.push(blobUrl);
+                    
+                    const obj = document.createElement('iframe');
+                    obj.src = blobUrl;
+                    obj.className = "w-full h-[600px] bg-white border-0"; 
                     obj.innerHTML = `<p class="p-4 text-sm text-gray-500">Your browser does not support viewing inline PDFs. <a href="#" onclick="downloadResource('${pdf.id}')" class="text-indigo-600 underline">Download it here</a>.</p>`;
                     
                     wrapper.appendChild(header);
@@ -915,6 +935,8 @@
                 state.notes = state.notes.filter(n => n.id !== state.activeNoteId);
                 state.activeNoteId = null;
                 
+                cleanupBlobUrls(); // Clean up memory
+
                 // Reset UI to empty view
                 document.getElementById('empty-state').classList.remove('hidden');
                 document.getElementById('note-view').classList.add('hidden');
@@ -1387,6 +1409,7 @@
                         state.notes = [];
                         state.expandedNotebooks.clear();
                         state.activeNoteId = null;
+                        cleanupBlobUrls();
                     }
 
                     // Re-populate DB
@@ -1502,6 +1525,8 @@
                 state.activeNoteId = null;
                 state.expandedNotebooks.clear();
                 
+                cleanupBlobUrls(); // Free up memory from PDFs
+
                 document.getElementById('empty-state').classList.remove('hidden');
                 document.getElementById('note-view').classList.add('hidden');
                 document.getElementById('create-view').classList.add('hidden');
