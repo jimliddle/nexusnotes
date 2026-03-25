@@ -71,6 +71,10 @@ Encrypted Backups: The "Secure Backup" feature uses PBKDF2 for key derivation (1
 
 Encryption Password: When you enable the "Local App Lock" in the Settings, the app generates a master key (using PBKDF2 and a secure salt) and encrypts every single note, image, and chat history stored inside the  browser's IndexedDB using AES-GCM. When you close the tab, the key is destroyed from memory. The next time you open the app, it will display a Lock Screen. Until the correct password is provided, Data remains completely unreadable cipher-text—even if someone physically opens the  browser's Developer Tools to inspect the database.
 
+### Scale
+
+Whereas technically there are no restraints other than disk space in how large IndexedDB can grow, practically this is good for a few thousand notes ie. not tens or hundreds of thousands of notes
+
 ### 📄 License
 
 This project is open-source and available under the MIT License.
